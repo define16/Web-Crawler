@@ -1,13 +1,16 @@
 from bs4 import BeautifulSoup;
 from selenium import webdriver;
 import time
+import os;
 
 class News :
     driver, html= '', '';  # 웹크롤링
     urlA = [];
 
     def __init__(self):
-        self.driver = webdriver.Chrome("D:/Programing Folder/Tools/chromedriver_win32/chromedriver.exe");
+        chromedriver = "/home/hallym-dpac/문서/tool/etc/chromedriver"
+        os.environ["webdriver.chrome.driver"] = chromedriver
+        self.driver = webdriver.Chrome(chromedriver)
         self.driver.implicitly_wait(3);
 
     def clearUrlA(self):
@@ -49,7 +52,7 @@ class News :
         # 마지막 페이지인지 체크
         if content_cnt % 10 == 0 :
             print("if content_cnt % 10 == 0 : ")
-            if page % 123 == 0 : #124까지 지원
+            if page % 100 == 0 : #124까지 지원
                 print("break")
                 time.sleep(60)
             page += 1;
@@ -82,7 +85,7 @@ class News :
 
         if flag :
             print("flag ")
-            if page % 123 == 0 : #124까지 지원
+            if page % 100 == 0 : #124까지 지원
                 print("break")
                 time.sleep(60)
             page += 1;
@@ -142,18 +145,21 @@ news = News();
 kind = ['catid=2&gnb_marketlist', 'catid=4&gnb_global', 'catid=1A&gnb_npolicy']
 url = 'http://biz.chosun.com/svc/list_in/list.html?'
 filename = ['증권', '부동산','정책과금융']
-path = "" ## 파일 저장 주소
+
 
 urlA = []
 for i in range(0, len(kind), 1) :
     del urlA[:] #배열 초기화
     news.clearUrlA()
 
+    path = "/home/hallym-dpac/문서/program files/python/news/경제(" + filename[i] + ").txt"  ## 파일 저장 주소
+
     kind_url = url + kind[i];
-    urlA = news.find_news_until_the_time(kind_url, 1, 2018)
+    urlA = news.find_news_until_the_time(kind_url, 1, 2013)
     for u in urlA :
         print(news.news_content_parsing(u))
-        news.save_textFile(path + filename[i], news.news_content_parsing(u))
+        news.save_textFile(path, news.news_content_parsing(u))
 
     print("kind change")
     time.sleep(60)
+

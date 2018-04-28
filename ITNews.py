@@ -1,6 +1,7 @@
 import time;
 from bs4 import BeautifulSoup;
 from selenium import webdriver;
+import os;
 
 # 순서
 # 1. 현재 날짜와 기사의 날짜가 같으면 date에 카운트 , page는 넘어갈때 마다 카운트 v
@@ -13,7 +14,9 @@ class ITNewsParsing :
     driver1, html, soup = '', '', '';  # 웹크롤링
 
     def __init__(self):
-        self.driver1 = webdriver.Chrome("D:/Programing Folder/Tools/chromedriver_win32/chromedriver.exe");
+        chromedriver = "/home/hallym-dpac/문서/tool/etc/chromedriver"
+        os.environ["webdriver.chrome.driver"] = chromedriver
+        self.driver1 = webdriver.Chrome(chromedriver)
         self.driver1.implicitly_wait(3);
 
     # 데이터 가지고 오기
