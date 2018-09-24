@@ -1,2 +1,2 @@
 # Web-Crawler
-무단 배포 금지.
+ Python모듈인 Selenium, bs4를 이용하여 만든 Crawler
