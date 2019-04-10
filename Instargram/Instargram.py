@@ -63,13 +63,33 @@ def login() :
     else :
         return '',''
 
+
+# 인스타그램 게시물 path
+# //*[@id=\"react-root\"]/section/main/article/div[1]/div/div/div[1]/div[1]/a
+# //*[@id=\"react-root\"]/section/main/article/div[1]/div/div/div[1]/div[2]/a
+#react-root > section > main > article > div.EZdmt > div > div > div:nth-of-type(1) > div:nth-of-type(1) > a
+#react-root > section > main > article > div.EZdmt > div > div > div:nth-of-type(1) > div:nth-of-type(2) > a
 def search(p) :
-    keyword = str(input('[검색어] :'))
-    # 여기서부터 제작 시작
-    p.driver.find_element_by_name('username').send_keys(id);
+    while True :
+        keyword = str(input('[검색어] (종료 - q) :'))
+        if keyword == "q" or keyword == "Q" :
+            break
+        # 여기서부터 제작 시작
+        search_url = "https://www.instagram.com/explore/tags/" + keyword
+        soup = p.getDataFromSoup(search_url)
+        i = 1
+        while True :
+            notices = soup.select('#react-root > section > main > article > div.EZdmt > div > div > div:nth-of-type(1) > div:nth-of-type('+ str(i) +') > a')
+
+            print(notices) # 비어 있음
+
+            # contents_url = "https://www.instagram.com" + notices.get('href')
+
+            # soup = p.getDataFromSoup(contents_url)
 
 
-    pass
+
+            i+=1
 
 
 if __name__ == '__main__':
@@ -95,13 +115,11 @@ if __name__ == '__main__':
 
         # 알림 여부 팝업창
         try :
-            print(p.driver.find_element_by_xpath("/html/body/div[3]/div"))
             p.driver.find_element_by_xpath("/html/body/div[3]/div/div/div[3]/button[2]").click()
         except selenium.common.exceptions.NoSuchElementException :
             pass
 
     # 검색어 입력
     search(p)
-
 
     print("[Done]")
