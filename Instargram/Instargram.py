@@ -7,6 +7,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from time import sleep
+import multiprocessing
+import queue
 
 from selenium.common.exceptions import ElementNotVisibleException
 import csv
@@ -44,6 +46,8 @@ class Parsing :
         wait = WebDriverWait(self.driver, delay)
         element = wait.until(EC.element_to_be_clickable((By.XPATH, "//*[@id=\"react-root\"]/section/main/article/div[2]/div[2]/p/a")))
 
+    def scroll_down(self):
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
 
     def saveFile(self,Path, mlist):
         file = open(Path, 'a', newline='')
@@ -64,12 +68,14 @@ def login() :
         return '',''
 
 
-# 인스타그램 게시물 path
+
+
+# 인스타그램 게시물 path ( 스캐너 쓰레드 1개)
 # //*[@id=\"react-root\"]/section/main/article/div[1]/div/div/div[1]/div[1]/a
 # //*[@id=\"react-root\"]/section/main/article/div[1]/div/div/div[1]/div[2]/a
 #react-root > section > main > article > div.EZdmt > div > div > div:nth-of-type(1) > div:nth-of-type(1) > a
 #react-root > section > main > article > div.EZdmt > div > div > div:nth-of-type(1) > div:nth-of-type(2) > a
-def search(p) :
+def search(p, blockqu) :
     while True :
         keyword = str(input('[검색어] (종료 - q) :'))
         if keyword == "q" or keyword == "Q" :
@@ -80,18 +86,23 @@ def search(p) :
         i = 1
         while True :
             notices = soup.select('#react-root > section > main > article > div.EZdmt > div > div > div:nth-of-type(1) > div:nth-of-type('+ str(i) +') > a')
-
             print(notices) # 비어 있음
 
-            # contents_url = "https://www.instagram.com" + notices.get('href')
+            contents_url = "https://www.instagram.com" + notices.get('href')
 
-            # soup = p.getDataFromSoup(contents_url)
-
-
+            ## 블록 큐에 삽입
+            # blockqu.put(contents_url);
 
             i+=1
 
+# 멀티 쓰레드 ( 큐 안에 있는 )
+def parsing_contents(blockqu) :
+    # while True:
+        # soup = p.getDataFromSoup(blockqu.get());
+    pass
 
+
+# main
 if __name__ == '__main__':
     isChromDriver = int(input('[ Chrom Driver : Inactive - 0, Active - 1 ] 입력 :'))
     id, pw = login()
@@ -103,6 +114,7 @@ if __name__ == '__main__':
         pass
     else :
         # 로그인
+        blockqu = queue.Queue(50)
         soup = p.getDataFromSoup(url)
         notices = soup.select('#react-root > section > main > article > div.rgFsT > div:nth-of-type(2) > p > a')
         url += notices[0].get('href')
@@ -111,7 +123,7 @@ if __name__ == '__main__':
         p.driver.find_element_by_name('username').send_keys(id);
         p.driver.find_element_by_name('password').send_keys(pw);
 
-        p.driver.find_element_by_xpath("//*[@id=\"react-root\"]/section/main/div/article/div/div[1]/div/form/div[4]/button").click()
+        p.driver.find_element_by_xpath("//*[@id=\"react-root\"]/section/main/div/article/div/div[1]/div/form/div[4]/button ").click()
 
         # 알림 여부 팝업창
         try :
@@ -119,7 +131,28 @@ if __name__ == '__main__':
         except selenium.common.exceptions.NoSuchElementException :
             pass
 
+
+
+    ## 오류 ##
     # 검색어 입력
-    search(p)
+    pool_scan = multiprocessing.Pool(processes=1)
+    p1 = pool_scan.Process(target=search, args=(p))
+    p1.start()
+
+    sleep(2)
+    pool_scroll = multiprocessing.Pool(processes=1)
+    p2 = pool_scroll.Process(target=p.scroll_down)
+    p2.start()
+
+    # 본문 저장
+    pool_parsing = multiprocessing.Pool(processes=4)
+    p3 = pool_parsing.Process(target=parsing_contents)
+    p3.start()
+
+
+    # 종료
+    p1.join()
+    pool_scan.join()
+    pool_parsing.join()
 
     print("[Done]")
