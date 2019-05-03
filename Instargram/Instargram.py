@@ -1,13 +1,16 @@
-from socket import socket
-
+import os
 import selenium
 from bs4 import BeautifulSoup
+from time import sleep
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from time import sleep
-import multiprocessing
+from selenium.common.exceptions import NoSuchElementException
+import random
+
+from tqdm import tqdm
+import threading
 import queue
 
 from selenium.common.exceptions import ElementNotVisibleException
@@ -40,6 +43,10 @@ class Parsing :
 
         return self.soup;
 
+    def getDriver(self, url):
+        sleep(3)
+        self.driver.get(url)
+
     def button_click(self,btn_xpath):
         delay = 10  # seconds
         print("delay :", delay)
@@ -49,11 +56,58 @@ class Parsing :
     def scroll_down(self):
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
 
+    def find_one(self, css_selector, elem=None, waittime=0):
+        obj = elem or self.driver
+
+        if waittime:
+            WebDriverWait(obj, waittime).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, css_selector))
+            )
+
+        try:
+            return obj.find_element(By.CSS_SELECTOR, css_selector)
+        except NoSuchElementException:
+            return None
+
+
+
+    def find(self, css_selector, elem=None, waittime=0):
+        obj = elem or self.driver
+
+        if waittime:
+            WebDriverWait(obj, waittime).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, css_selector))
+            )
+
+        try:
+            return obj.find_elements(By.CSS_SELECTOR, css_selector)
+        except NoSuchElementException:
+            return None
+
+    def scroll_down(self, wait=0.3):
+        self.driver.execute_script(
+            'window.scrollTo(0, document.body.scrollHeight)')
+        self.randmized_sleep(wait)
+
+    def scroll_up(self, offset=-1, wait=2):
+        if (offset == -1):
+            self.driver.execute_script('window.scrollTo(0, 0)')
+        else:
+            self.driver.execute_script('window.scrollBy(0, -%s)' % offset)
+        self.randmized_sleep(wait)
+
+    def randmized_sleep(self, average=1):
+        _min, _max = average * 1 / 2, average * 3 / 2
+        sleep(random.uniform(_min, _max))
+
     def saveFile(self,Path, mlist):
-        file = open(Path, 'a', newline='')
+        if not os.path.exists(os.path.abspath("saveFile")) :
+            os.makedirs(os.path.abspath("saveFile"))
+        file = open(Path, 'a', encoding="utf-8", newline='')
         csvFile = csv.writer(file)
-        csvFile.writerow(['날짜','본문','해시태크'])
-        csvFile.writerow(mlist)
+        csvFile.writerow(['ID','본문','해시태크'])
+        for row in mlist :
+            csvFile.writerow(row)
         self.flag = False
         file.close()
 
@@ -69,57 +123,25 @@ def login() :
 
 
 
+def search() :
+    TIMEOUT = 600
+    posts = []
+    pre_post_num = 0
+    wait_time = 1
 
-# 인스타그램 게시물 path ( 스캐너 쓰레드 1개)
-# //*[@id=\"react-root\"]/section/main/article/div[1]/div/div/div[1]/div[1]/a
-# //*[@id=\"react-root\"]/section/main/article/div[1]/div/div/div[1]/div[2]/a
-#react-root > section > main > article > div.EZdmt > div > div > div:nth-of-type(1) > div:nth-of-type(1) > a
-#react-root > section > main > article > div.EZdmt > div > div > div:nth-of-type(1) > div:nth-of-type(2) > a
-def search(p, blockqu) :
-    while True :
-        keyword = str(input('[검색어] (종료 - q) :'))
-        if keyword == "q" or keyword == "Q" :
-            break
-        # 여기서부터 제작 시작
-        search_url = "https://www.instagram.com/explore/tags/" + keyword
-        soup = p.getDataFromSoup(search_url)
-        i = 1
-        while True :
-            notices = soup.select('#react-root > section > main > article > div.EZdmt > div > div > div:nth-of-type(1) > div:nth-of-type('+ str(i) +') > a')
-            print(notices) # 비어 있음
-
-            contents_url = "https://www.instagram.com" + notices.get('href')
-
-            ## 블록 큐에 삽입
-            # blockqu.put(contents_url);
-
-            i+=1
-
-# 멀티 쓰레드 ( 큐 안에 있는 )
-def parsing_contents(blockqu) :
-    # while True:
-        # soup = p.getDataFromSoup(blockqu.get());
-    pass
-
-
-# main
-if __name__ == '__main__':
-    isChromDriver = int(input('[ Chrom Driver : Inactive - 0, Active - 1 ] 입력 :'))
     id, pw = login()
     url = 'https://www.instagram.com'
-    print("ID :", id, "PW :", pw)
-    p = Parsing(isChromDriver)
 
     if id == '' and pw == '' :
         pass
     else :
         # 로그인
-        blockqu = queue.Queue(50)
+        print("ID :", id, "PW :", pw)
         soup = p.getDataFromSoup(url)
         notices = soup.select('#react-root > section > main > article > div.rgFsT > div:nth-of-type(2) > p > a')
         url += notices[0].get('href')
 
-        soup = p.getDataFromSoup(url)
+        p.getDriver(url)
         p.driver.find_element_by_name('username').send_keys(id);
         p.driver.find_element_by_name('password').send_keys(pw);
 
@@ -132,27 +154,126 @@ if __name__ == '__main__':
             pass
 
 
+    keyword = str(input('[검색어] :'))
 
-    ## 오류 ##
-    # 검색어 입력
-    pool_scan = multiprocessing.Pool(processes=1)
-    p1 = pool_scan.Process(target=search, args=(p))
-    p1.start()
+    # 여기서부터 제작 시작
+    search_url = "https://www.instagram.com/explore/tags/" + keyword
+    p.driver.get(search_url)
+    sleep(3)
 
-    sleep(2)
-    pool_scroll = multiprocessing.Pool(processes=1)
-    p2 = pool_scroll.Process(target=p.scroll_down)
-    p2.start()
+    content_cnt = int(str(p.find_one("span .g47SY").text).replace(",", ""))
 
-    # 본문 저장
-    pool_parsing = multiprocessing.Pool(processes=4)
-    p3 = pool_parsing.Process(target=parsing_contents)
-    p3.start()
+    pbar = tqdm(total=content_cnt)
+
+    def start_fetching(pre_post_num, wait_time):
+        ele_posts = p.find('.v1Nh3 a')
+        for ele in ele_posts:
+            key = ele.get_attribute('href')
+            print("link : "  + key)
+            # 큐 삽입
+            que.put(key)
+
+        if pre_post_num == len(posts):
+            pbar.set_description('Wait for %s sec' % (wait_time))
+            sleep(wait_time)
+            pbar.set_description('fetching')
+
+            wait_time *= 2
+            p.scroll_up(300)
+        else:
+            wait_time = 1
+
+        pre_post_num = len(posts)
+        p.scroll_down()
+
+        return pre_post_num, wait_time
+
+    pbar.set_description('fetching')
+    while len(posts) < content_cnt and wait_time < TIMEOUT:
+        post_num, wait_time = start_fetching(pre_post_num, wait_time)
+        pbar.update(post_num - pre_post_num)
+        pre_post_num = post_num
+
+        loading = p.find_one('.W1Bne')
+        if (not loading and wait_time > TIMEOUT / 2):
+            break
+
+    pbar.close()
+    print('Done. Fetched %s posts.' % (min(len(posts), content_cnt)))
+    search_flag = True
 
 
-    # 종료
-    p1.join()
-    pool_scan.join()
-    pool_parsing.join()
+# 멀티 쓰레드 ( 큐 안에 있는 )
+def parsing_contents(id) :
+    idx = 1
+    mlist = []
+    while (not search_flag and que.qsize() != 0) :
+        row = []
+        p.driver.get(que.get(180))
+        userID, txt, hashtag = "", "", ""
+        # 저장 부분 제작하기
+        userID = p.find_one("div .C4VMK h2 .FPmhX").text
+
+        ele_contents = p.find("li:nth-of-type(1) div .C4VMK span")
+        for content in ele_contents :
+            txt += content.text
+        txt = txt.replace("\n", " ")
+        ele_tags = p.find("li:nth-of-type(2) div.C4VMK span a")
+        for tag in ele_tags :
+            hashtag += tag.text
+
+        row.append(userID)
+        row.append(txt)
+        row.append(hashtag)
+
+        mlist.append(row)
+
+        # 저장 부분
+        if que.qsize() == 0 or idx % 300 == 0 :
+            path = os.path.abspath(os.path.join("saveFile", "file"+str(id)+".csv"))
+            print(mlist)
+            p.saveFile(path, mlist)
+            mlist = []
+
+        idx += 1
+
+## 스레드 동기화 해결하기
+# main
+if __name__ == '__main__':
+    global que, p, content_cnt, search_flag
+    search_flag = False
+    content_cnt = 7
+    que = queue.Queue(100)
+    worker_threads = []
+    isChromDriver = int(input('[ Chrom Driver : Inactive - 0, Active - 1 ] 입력 :'))
+    p = Parsing(isChromDriver)
+
+    print("Search 쓰레드 시작")
+    search_thread = threading.Thread(target=search)
+    search_thread.start()
+    sleep(10)
+
+    for i in range(0,8,1):
+        print(str(i)+"번째 Worker 쓰레드 시작")
+        worker_thread = threading.Thread(target=parsing_contents, args=(i,))
+        worker_threads.append(worker_thread)
+        worker_threads[i].start()
+
+    search_thread.join()
+    for i in range(0,8,1):
+        parsing_contents[i].join()
+
+    # que.put("https://www.instagram.com/p/BwKECPLADQJ/")
+    # que.put("https://www.instagram.com/p/Bs5hMq2gC5i/")
+    # que.put("https://www.instagram.com/p/Bu-7sCgnc8B/")
+    # que.put("https://www.instagram.com/p/BvNwIvvHILi/")
+    # que.put("https://www.instagram.com/p/BxAR4A3AJ41/")
+    # que.put("https://www.instagram.com/p/BxAJ7gqA6ve/")
+    # que.put("https://www.instagram.com/p/BxAIrPxg_sa/")
+    # i = 1
+    # # test content
+    # worker_thread = threading.Thread(target=parsing_contents, args=(i,))
+    # worker_thread.start()
+    # worker_thread.join()
 
     print("[Done]")
