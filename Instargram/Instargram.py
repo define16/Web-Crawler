@@ -105,7 +105,7 @@ class Parsing :
             os.makedirs(os.path.abspath("saveFile"))
         file = open(Path, 'a', encoding="utf-8", newline='')
         csvFile = csv.writer(file)
-        csvFile.writerow(['ID','본문','해시태크'])
+        csvFile.writerow(['ID','날짜','본문','해시태크'])
         for row in mlist :
             csvFile.writerow(row)
         self.flag = False
@@ -209,22 +209,31 @@ def parsing_contents(id) :
     mlist = []
     while (not search_flag and que.qsize() != 0) :
         row = []
-        p.driver.get(que.get(180))
+        p.driver.get(que.get())
         userID, txt, hashtag = "", "", ""
         # 저장 부분 제작하기
         userID = p.find_one("div .C4VMK h2 .FPmhX").text
+        t_date = p.find_one("div.eo2As div.k_Q0X.NnvRN a time").get_attribute("datetime")
+
+
 
         ele_contents = p.find("li:nth-of-type(1) div .C4VMK span")
         for content in ele_contents :
             txt += content.text
         txt = txt.replace("\n", " ")
-        ele_tags = p.find("li:nth-of-type(2) div.C4VMK span a")
+        ele_tags = p.find("div.C4VMK span a")
         for tag in ele_tags :
             hashtag += tag.text
 
         row.append(userID)
+        row.append(t_date)
         row.append(txt)
         row.append(hashtag)
+
+        # print(userID)
+        # print(t_date)
+        # print(txt)
+        # print(hashtag)
 
         mlist.append(row)
 
@@ -240,7 +249,7 @@ def parsing_contents(id) :
 ## 스레드 동기화 해결하기
 # main
 if __name__ == '__main__':
-    global que, p, content_cnt, search_flag
+    global que, p, content_cnt, search_flag, isChromDriver
     search_flag = False
     content_cnt = 7
     que = queue.Queue(100)
@@ -248,13 +257,16 @@ if __name__ == '__main__':
     isChromDriver = int(input('[ Chrom Driver : Inactive - 0, Active - 1 ] 입력 :'))
     p = Parsing(isChromDriver)
 
-    print("Search 쓰레드 시작")
+    print("Search Thread 시작")
     search_thread = threading.Thread(target=search)
     search_thread.start()
-    sleep(10)
+
+    while que.qsize() < 10 :
+        pass
+
 
     for i in range(0,8,1):
-        print(str(i)+"번째 Worker 쓰레드 시작")
+        print(str(i)+"번째 Worker Thread 시작")
         worker_thread = threading.Thread(target=parsing_contents, args=(i,))
         worker_threads.append(worker_thread)
         worker_threads[i].start()
@@ -263,6 +275,7 @@ if __name__ == '__main__':
     for i in range(0,8,1):
         parsing_contents[i].join()
 
+    ## Test 용
     # que.put("https://www.instagram.com/p/BwKECPLADQJ/")
     # que.put("https://www.instagram.com/p/Bs5hMq2gC5i/")
     # que.put("https://www.instagram.com/p/Bu-7sCgnc8B/")
