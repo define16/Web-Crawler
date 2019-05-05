@@ -11,7 +11,7 @@ import random
 
 from tqdm import tqdm
 import threading
-import queue
+from queue import Queue
 
 import csv
 
@@ -104,14 +104,13 @@ class Parsing :
             os.makedirs(os.path.abspath("saveFile"))
         file = open(Path, 'a', encoding="utf-8", newline='')
         csvFile = csv.writer(file)
-        csvFile.writerow(['ID','날짜','본문','해시태크'])
         for row in mlist :
-            csvFile.writerow(row)
+            csvFile.writerow(row) # ['날짜', '본문', '해시태크']
         self.flag = False
         file.close()
 
 def login() :
-    isLogin = int(input('로그인 상태면 0, 아니면 1 입력 :'))
+    isLogin = int(input('비로그인 모드 : 0, 로그인 모드 1 입력 :'))
     if isLogin == 1 :
         id = str(input('ID : '))
         pw = str(input('PW : '))
@@ -125,10 +124,9 @@ def login() :
 def search() :
     p = Parsing(isChromDriver)
     TIMEOUT = 600
-    posts = []
     pre_post_num = 0
     wait_time = 1
-
+    url_set = set()
     id, pw = login()
     url = 'https://www.instagram.com'
 
@@ -169,11 +167,16 @@ def search() :
         ele_posts = p.find('.v1Nh3 a')
         for ele in ele_posts:
             key = ele.get_attribute('href')
-            print("link : "  + key)
-            # 큐 삽입
-            que.put(key)
+            url = str(key).split("/")[4]
 
-        if pre_post_num == len(posts):
+            if url not in list(url_set) :
+                print("link : "  + key)
+                url_set.add(url)
+
+                # 큐 삽입
+                que.put(key)
+
+        if pre_post_num == len(list(url_set)):
             pbar.set_description('Wait for %s sec' % (wait_time))
             sleep(wait_time)
             pbar.set_description('fetching')
@@ -183,13 +186,13 @@ def search() :
         else:
             wait_time = 1
 
-        pre_post_num = len(posts)
+        pre_post_num = len(list(url_set))
         p.scroll_down()
 
         return pre_post_num, wait_time
 
     pbar.set_description('fetching')
-    while len(posts) < content_cnt and wait_time < TIMEOUT:
+    while len(list(url_set)) < content_cnt and wait_time < TIMEOUT:
         post_num, wait_time = start_fetching(pre_post_num, wait_time)
         pbar.update(post_num - pre_post_num)
         pre_post_num = post_num
@@ -199,25 +202,24 @@ def search() :
             break
 
     pbar.close()
-    print('Done. Fetched %s posts.' % (min(len(posts), content_cnt)))
-    search_flag = True
+    print('Done. Fetched %s posts.' % (min(len(list(url_set)), content_cnt)))
+    search_flag = False
+    print("Search Thread 종료")
 
 
-# 멀티 쓰레드 ( 큐 안에 있는 )
+
+# 멀티 쓰레드
 def parsing_contents(id) :
     p = Parsing(isChromDriver)
     idx = 1
     mlist = []
-    while (not search_flag and que.qsize() != 0) :
+    while search_flag :
         row = []
         p.driver.get(que.get())
         userID, txt, hashtag = "", "", ""
         # 저장 부분 제작하기
-        userID = p.find_one("div .C4VMK h2 .FPmhX").text
+        # userID = p.find_one("div .C4VMK h2 .FPmhX").text
         t_date = p.find_one("div.eo2As div.k_Q0X.NnvRN a time").get_attribute("datetime")
-
-
-
         ele_contents = p.find("li:nth-of-type(1) div .C4VMK span")
         for content in ele_contents :
             txt += content.text
@@ -227,7 +229,7 @@ def parsing_contents(id) :
             if "@" not in tag.text:
                 hashtag += tag.text
 
-        row.append(userID)
+        # row.append(userID)
         row.append(t_date)
         row.append(txt)
         row.append(hashtag)
@@ -235,20 +237,29 @@ def parsing_contents(id) :
         mlist.append(row)
 
         # 저장 부분
-        if que.qsize() == 0 or idx % 100 == 0 :
+        if idx % 50 == 0 :
             path = os.path.abspath(os.path.join("saveFile", "file"+str(id)+".csv"))
-            print(mlist)
             p.saveFile(path, mlist)
+            print(mlist)
             mlist = []
 
         idx += 1
+        print("search_flag",search_flag, "que.qsize()", que.qsize())
+
+    if not search_flag :
+        path = os.path.abspath(os.path.join("saveFile", "file" + str(id) + ".csv"))
+        p.saveFile(path, mlist)
+        print(mlist)
+        mlist = []
+
+    print("Worer Thread 종료")
 
 # main
 if __name__ == '__main__':
     global que, content_cnt, search_flag, isChromDriver
-    search_flag = False
+    search_flag = True
     content_cnt = 7
-    que = queue.Queue(100)
+    que = Queue(100)
     worker_threads = []
     isChromDriver = int(input('[ Chrom Driver : Inactive - 0, Active - 1 ] 입력 :'))
 
@@ -260,14 +271,14 @@ if __name__ == '__main__':
         pass
 
 
-    for i in range(0,8,1):
+    for i in range(0,7,1):
         print(str(i)+"번째 Worker Thread 시작")
         worker_thread = threading.Thread(target=parsing_contents, args=(i,))
         worker_threads.append(worker_thread)
         worker_threads[i].start()
 
     search_thread.join()
-    for i in range(0,8,1):
+    for i in range(0,7,1):
         parsing_contents[i].join()
 
     print("[Done]")
