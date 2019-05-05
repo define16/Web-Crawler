@@ -13,14 +13,13 @@ from tqdm import tqdm
 import threading
 import queue
 
-from selenium.common.exceptions import ElementNotVisibleException
 import csv
 
 
 class Parsing :
-    global driver
-    global html
-    global soup
+    driver = None
+    html = None
+    soup = None
     flag = True
 
     def __init__(self,flag):
@@ -54,7 +53,7 @@ class Parsing :
         element = wait.until(EC.element_to_be_clickable((By.XPATH, "//*[@id=\"react-root\"]/section/main/article/div[2]/div[2]/p/a")))
 
     def scroll_down(self):
-        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
 
     def find_one(self, css_selector, elem=None, waittime=0):
         obj = elem or self.driver
@@ -124,6 +123,7 @@ def login() :
 
 
 def search() :
+    p = Parsing(isChromDriver)
     TIMEOUT = 600
     posts = []
     pre_post_num = 0
@@ -205,6 +205,7 @@ def search() :
 
 # 멀티 쓰레드 ( 큐 안에 있는 )
 def parsing_contents(id) :
+    p = Parsing(isChromDriver)
     idx = 1
     mlist = []
     while (not search_flag and que.qsize() != 0) :
@@ -223,22 +224,18 @@ def parsing_contents(id) :
         txt = txt.replace("\n", " ")
         ele_tags = p.find("div.C4VMK span a")
         for tag in ele_tags :
-            hashtag += tag.text
+            if "@" not in tag.text:
+                hashtag += tag.text
 
         row.append(userID)
         row.append(t_date)
         row.append(txt)
         row.append(hashtag)
 
-        # print(userID)
-        # print(t_date)
-        # print(txt)
-        # print(hashtag)
-
         mlist.append(row)
 
         # 저장 부분
-        if que.qsize() == 0 or idx % 300 == 0 :
+        if que.qsize() == 0 or idx % 100 == 0 :
             path = os.path.abspath(os.path.join("saveFile", "file"+str(id)+".csv"))
             print(mlist)
             p.saveFile(path, mlist)
@@ -246,16 +243,14 @@ def parsing_contents(id) :
 
         idx += 1
 
-## 스레드 동기화 해결하기
 # main
 if __name__ == '__main__':
-    global que, p, content_cnt, search_flag, isChromDriver
+    global que, content_cnt, search_flag, isChromDriver
     search_flag = False
     content_cnt = 7
     que = queue.Queue(100)
     worker_threads = []
     isChromDriver = int(input('[ Chrom Driver : Inactive - 0, Active - 1 ] 입력 :'))
-    p = Parsing(isChromDriver)
 
     print("Search Thread 시작")
     search_thread = threading.Thread(target=search)
@@ -274,19 +269,5 @@ if __name__ == '__main__':
     search_thread.join()
     for i in range(0,8,1):
         parsing_contents[i].join()
-
-    ## Test 용
-    # que.put("https://www.instagram.com/p/BwKECPLADQJ/")
-    # que.put("https://www.instagram.com/p/Bs5hMq2gC5i/")
-    # que.put("https://www.instagram.com/p/Bu-7sCgnc8B/")
-    # que.put("https://www.instagram.com/p/BvNwIvvHILi/")
-    # que.put("https://www.instagram.com/p/BxAR4A3AJ41/")
-    # que.put("https://www.instagram.com/p/BxAJ7gqA6ve/")
-    # que.put("https://www.instagram.com/p/BxAIrPxg_sa/")
-    # i = 1
-    # # test content
-    # worker_thread = threading.Thread(target=parsing_contents, args=(i,))
-    # worker_thread.start()
-    # worker_thread.join()
 
     print("[Done]")
