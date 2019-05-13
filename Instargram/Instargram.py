@@ -31,12 +31,15 @@ class Parsing :
             options.add_argument('disable-gpu')
 
             self.driver = webdriver.Chrome("D:/Programing Folder/Tools/chromedriver_win32/chromedriver.exe", options=options)
-        else :
+        elif flag == 1 :
             if platform.system() == 'Windows':
-                options.add_argument("--start-maximized");
+                options.add_argument("--start-maximized")
             else :
-                options.add_argument("--kiosk");
+                options.add_argument("--kiosk")
             self.driver = webdriver.Chrome("D:/Programing Folder/Tools/chromedriver_win32/chromedriver.exe" ,options=options)
+
+        else :
+            self.driver = webdriver.Chrome("D:/Programing Folder/Tools/chromedriver_win32/chromedriver.exe")
 
 
         self.driver.implicitly_wait(3)
@@ -132,7 +135,7 @@ def login() :
 
 def search() :
     global search_flag
-    p = Parsing(isChromDriver)
+    p = Parsing(isChromDriver_search)
     TIMEOUT = 20
     pre_post_num = 0
     wait_time = 1
@@ -219,7 +222,7 @@ def search() :
 # 멀티 쓰레드
 def parsing_contents(id) :
     global search_flag
-    p = Parsing(isChromDriver)
+    p = Parsing(isChromDriver_parsing)
     idx = 1
     mlist = []
     while search_flag :
@@ -269,12 +272,14 @@ def parsing_contents(id) :
 
 # main
 if __name__ == '__main__':
-    global que, content_cnt, search_flag, isChromDriver
+    global que, content_cnt, search_flag, isChromDriver_parsing, isChromDriver_search
     search_flag = True
     content_cnt = 7
     que = Queue(100)
     worker_threads = []
-    isChromDriver = int(input('[ Chrom Driver : Inactive - 0, Active - 1 ] 입력 :'))
+    print("Web Driver 옵션 권장 사항 : SEARCH용 browser은 Active, PARSING용 browser은 Inactive")
+    isChromDriver_search = int(input('[ Chrom Driver For SEARCH : Inactive - 0, Active - 1 ] 입력 :'))
+    isChromDriver_parsing = int(input('[ Chrom Driver For PARSING : Inactive - 0, Active - 2 ] 입력 :'))
 
     print("Search Thread 시작")
     search_thread = threading.Thread(target=search)
