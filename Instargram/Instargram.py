@@ -1,5 +1,6 @@
 import os
 import selenium
+import queue
 from bs4 import BeautifulSoup
 from time import sleep
 from selenium import webdriver
@@ -8,6 +9,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException
 import random
+import platform
 
 from tqdm import tqdm
 import threading
@@ -23,15 +25,22 @@ class Parsing :
     flag = True
 
     def __init__(self,flag):
+        options = webdriver.ChromeOptions()
         if flag == 0 :
-            options = webdriver.ChromeOptions()
             options.add_argument('headless')
             options.add_argument('disable-gpu')
+
             self.driver = webdriver.Chrome("D:/Programing Folder/Tools/chromedriver_win32/chromedriver.exe", options=options)
         else :
-            self.driver = webdriver.Chrome("D:/Programing Folder/Tools/chromedriver_win32/chromedriver.exe")
+            if platform.system() == 'Windows':
+                options.add_argument("--start-maximized");
+            else :
+                options.add_argument("--kiosk");
+            self.driver = webdriver.Chrome("D:/Programing Folder/Tools/chromedriver_win32/chromedriver.exe" ,options=options)
+
 
         self.driver.implicitly_wait(3)
+
 
     # 데이터 가지고 오기
     def getDataFromSoup(self, url):
@@ -122,8 +131,9 @@ def login() :
 
 
 def search() :
+    global search_flag
     p = Parsing(isChromDriver)
-    TIMEOUT = 600
+    TIMEOUT = 20
     pre_post_num = 0
     wait_time = 1
     url_set = set()
@@ -180,12 +190,10 @@ def search() :
             pbar.set_description('Wait for %s sec' % (wait_time))
             sleep(wait_time)
             pbar.set_description('fetching')
-
             wait_time *= 2
             p.scroll_up(300)
         else:
             wait_time = 1
-
         pre_post_num = len(list(url_set))
         p.scroll_down()
 
@@ -210,12 +218,16 @@ def search() :
 
 # 멀티 쓰레드
 def parsing_contents(id) :
+    global search_flag
     p = Parsing(isChromDriver)
     idx = 1
     mlist = []
     while search_flag :
         row = []
-        p.driver.get(que.get())
+        try:
+            p.driver.get(que.get(timeout = 40))
+        except queue.Empty :
+            break;
         userID, txt, hashtag = "", "", ""
         # 저장 부분 제작하기
         # userID = p.find_one("div .C4VMK h2 .FPmhX").text
@@ -246,6 +258,7 @@ def parsing_contents(id) :
         idx += 1
         print("search_flag",search_flag, "que.qsize()", que.qsize())
 
+    print("search_flag",search_flag)
     if not search_flag :
         path = os.path.abspath(os.path.join("saveFile", "file" + str(id) + ".csv"))
         p.saveFile(path, mlist)
@@ -277,8 +290,10 @@ if __name__ == '__main__':
         worker_threads.append(worker_thread)
         worker_threads[i].start()
 
+    print("for : start")
     search_thread.join()
+    print("search_thread.join()")
     for i in range(0,7,1):
-        parsing_contents[i].join()
+        worker_threads[i].join()
 
     print("[Done]")
